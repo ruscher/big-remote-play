@@ -715,15 +715,20 @@ class PerformanceMonitor(Gtk.Box):
                 warnings.append(("hdr_as_sdr", report.screen))
         return " · ".join(part for part in parts if part), tuple(warnings)
 
-    def _display_name(self, address: str) -> str:
+    def _known_name(self, address: str) -> str:
+        """A saved, private-network or reverse-DNS name for ``address``; "" when none."""
         if not address:
-            return _("Connected device")
+            return ""
         if address not in self._names:
             from big_remote_play.private_network.devices import DevicePreferences
 
-            name = DevicePreferences().display_name(address, "") or self._peer_name(address) or self._resolve_hostname(address) or ""
-            self._names[address] = name or _("Device at {address}").format(address=address)
+            self._names[address] = DevicePreferences().display_name(address, "") or self._peer_name(address) or self._resolve_hostname(address) or ""
         return self._names[address]
+
+    def _display_name(self, address: str) -> str:
+        if not address:
+            return _("Connected device")
+        return self._known_name(address) or _("Device at {address}").format(address=address)
 
     @staticmethod
     def _peer_name(address: str) -> str:
@@ -785,7 +790,9 @@ class PerformanceMonitor(Gtk.Box):
                     window = self._windows.setdefault(address, LatencyWindow())
                     health = window.add(ping_once(address)) if sample else window.health
                     transport = self._transport(address, now)
-                infos.append(ConnectionInfo(name, address, transport, health, True, started, video, warnings, bool(getattr(session, "preexisting", False))))
+                # A tracked Sunshine session is named only by what _known_name found.
+                name_known = isinstance(session, str) or bool(self._known_name(address))
+                infos.append(ConnectionInfo(name, address, transport, health, True, started, video, warnings, bool(getattr(session, "preexisting", False)), name_known))
             current = {target[0] for target in targets}
             for address in list(self._windows):
                 if address not in current:

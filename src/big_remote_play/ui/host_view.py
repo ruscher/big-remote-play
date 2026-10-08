@@ -2656,8 +2656,7 @@ class HostView(Gtk.Box):
 
     def _announce_connections(self, infos) -> None:
         """A desktop notification for each device that just started playing."""
-        placeholders = {_("Connected device"), *(_("Device at {address}").format(address=info.address) for info in infos if info.address)}
-        for notice in self._connection_notices.update(infos, known_names=placeholders):
+        for notice in self._connection_notices.update(infos):
             self._notice_count += 1
             title, body = self._connection_notice_text(notice)
             self._deliver_notification(f"brp-device-connected-{self._notice_count}", title, body)
