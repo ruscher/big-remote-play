@@ -105,6 +105,7 @@ This release is about finding things by themselves: your installed games, the co
 - **ZeroTier on and off without a password** — a helper limited to starting and stopping the private-network service, allowed for the person at the computer; no sudoers rule ([details](docs/zerotier-permissions.md)).
 - **Choose the screen where the game opens** — **Connect → Image → Open on** opens Moonlight on the chosen screen of this computer on X11 ([several screens](docs/moonlight-multi-monitor.md)).
 - **The shared monitor you chose, really shared** — on X11 the game PC now sends the monitor picked in **Share**, and each monitor is listed once instead of twice.
+- **The mouse pointer on the phone with an X11 desktop** — with **Capture Method** on **Automatic**, an X11 session now uses X11 capture, which draws the pointer into the picture; KMS capture on X11 sent none and is now reported in **Needs attention** ([details](docs/mouse-cursor-compatibility.md)).
 - **Controls on the phone** — **Shortcuts & Instructions** has a tab for Moonlight on a computer, Android, iPhone/iPad and controllers, and a QR code that opens the guide on the phone ([guide](docs/mobile-controls.md)).
 
 Earlier: a simpler Share page, automatic pairing with Sunshine's password kept in the keyring, up to four players at once, streams that drop explained with **Lower quality and connect again**, and the mouse pointer on Wayland.
