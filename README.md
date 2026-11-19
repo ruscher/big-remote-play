@@ -126,7 +126,7 @@ Before installing, you can check the file:
 
 | | |
 |---|---|
-| SHA-256 of the APK | `2c4ab2ee80c3e464a992c015281a2d3fe65b05c67ad043a651cb69f36991319e` |
+| SHA-256 of the APK | `861d568d9cd2ce242b013c093538b55294f962d76a3bf0073dc0e5b03912509e` |
 | Signing certificate (SHA-256) | `A2:8A:FA:C5:45:EC:5A:E3:5E:CC:87:F2:8E:BD:0A:69:90:F2:2F:C3:4B:3D:41:80:AD:3D:07:26:6C:71:C9:26` |
 
 ```bash
