@@ -120,18 +120,18 @@ At the time of writing, the `big-keyboard` with remote touch is not yet in a pac
 
 ### 1. Download the app
 
-**[Download Big Remote Play Controller 12.2-brpc2 (APK)](https://github.com/ruscher/big-remote-play/releases/download/controller-v12.2-brpc2/big-remote-play-controller-12.2-brpc2.apk)** · [release page](https://github.com/ruscher/big-remote-play/releases/tag/controller-v12.2-brpc2) · [source code](https://github.com/ruscher/moonlight-android-touch/tree/brp/native-touch) (GPL-3.0)
+**[Download Big Remote Play Controller 12.2-brpc3 (APK)](https://github.com/ruscher/big-remote-play/releases/download/controller-v12.2-brpc3/big-remote-play-controller-12.2-brpc3.apk)** · [release page](https://github.com/ruscher/big-remote-play/releases/tag/controller-v12.2-brpc3) · [source code](https://github.com/ruscher/moonlight-android-touch/tree/brp/native-touch) (GPL-3.0)
 
 Before installing, you can check the file:
 
 | | |
 |---|---|
-| SHA-256 of the APK | `a6cb6b48b02a5994a631690980cfe9d67665bd9e6905b71c2b0c06a0fdc6bc86` |
+| SHA-256 of the APK | `2c4ab2ee80c3e464a992c015281a2d3fe65b05c67ad043a651cb69f36991319e` |
 | Signing certificate (SHA-256) | `A2:8A:FA:C5:45:EC:5A:E3:5E:CC:87:F2:8E:BD:0A:69:90:F2:2F:C3:4B:3D:41:80:AD:3D:07:26:6C:71:C9:26` |
 
 ```bash
-sha256sum big-remote-play-controller-12.2-brpc2.apk
-apksigner verify --print-certs big-remote-play-controller-12.2-brpc2.apk   # from the Android SDK build-tools
+sha256sum big-remote-play-controller-12.2-brpc3.apk
+apksigner verify --print-certs big-remote-play-controller-12.2-brpc3.apk   # from the Android SDK build-tools
 ```
 
 ### 2. Install it on the phone
@@ -151,19 +151,40 @@ apksigner verify --print-certs big-remote-play-controller-12.2-brpc2.apk   # fro
 ```bash
 sudo pacman -S --needed android-tools
 adb devices
-adb install big-remote-play-controller-12.2-brpc2.apk
+adb install big-remote-play-controller-12.2-brpc3.apk
 ```
 
-To update, install the new APK over the old one (`adb install -r …`): pairing and settings are kept.
+To update, install the new APK over the old one (`adb install -r …`): pairing and settings are kept. 12.2-brpc3 is signed with the same key as 12.2-brpc2, so it installs over it.
 
 ### 3. Turn it on
 
 1. **Game computer** — open **Share → Preferences → Mouse, keyboard and controllers → Touch controls** and set **What touch does** to **On-screen controller**. Keep **Open when a device starts playing** on. Then press **Start sharing** (**Full Desktop**; with **Game Window** the phone sees only the game, not this controller).
 2. **Phone** — open **Big Remote Play Controller**, choose the game computer and pair with the PIN, like in Moonlight.
-3. In the app's **Settings**, **Send touch to the computer (multi-touch)** is already on. Leave **Show on-screen controls** off, or the game sees two controllers.
+3. In the app's **Settings**, **Send touch to the computer (multi-touch)** is already on. Leave the app's own on-screen controller off (**Controller** page of the stream menu), or the game sees two controllers.
 4. Open **Desktop**. The controller appears on the shared screen when the phone starts playing, and closes when the last device leaves. **Edit layout** moves and resizes the buttons from the phone.
 
 **Compatibility** in the same sheet says what is ready and what is missing, in words. **Release all buttons** lets go of anything still pressed after a network drop.
+
+### The stream menu (Stream Control Center)
+
+While streaming, pull the small bar at the top of the phone's screen down, or press **Back**, to open the app's own menu. Back no longer drops the stream: **Disconnect** is in the menu. Opening it first lets go of every finger, button and key on the computer.
+
+<p align="center">
+  <img src="docs/screenshots/android-control-center.png" width="520" alt="Big Remote Play Controller's stream menu on a phone: the computer and the screen being streamed, connection Excellent at 8 ms, the pages Quick, Keyboard, Controller, Screen, Video and Session, and quick actions Keyboard, On-screen controller, Statistics, Switch screen, Lower quality and reconnect and Disconnect">
+  <img src="docs/screenshots/android-controller-layouts.png" width="520" alt="The Controller page: layouts Pad, Shooter, Racing and Fighting drawn as small previews, and Moonlight's original layout">
+  <br><sub>The stream menu on a phone (Portuguese), streaming <b>01 - Monitor</b>. The computer's desktop around it is blurred.</sub>
+</p>
+
+| Page | What it does |
+|---|---|
+| **Quick** | Connection quality in words and real numbers: latency, frame rate, codec, decoding time, frames lost. Keyboard, controller, statistics on screen, switch screen, lower quality and reconnect, disconnect. |
+| **Keyboard** | Opens the phone's keyboard with a bar of the keys it lacks: Esc, Tab, Ctrl, Alt, Shift, Win (tap to lock or hold), arrows, Home/End, Page Up/Down, Insert, Delete, Print Screen, F1–F24. Shortcuts (Ctrl+C, Alt+Tab, Alt+F4, Ctrl+Alt+Del, Win+D…) and **type the text copied on the phone**. |
+| **Controller** | The controller drawn on the phone: show or hide it, layouts **Pad**, **Shooter**, **Racing**, **Fighting** or Moonlight's original, edit and reset the layout, opacity. |
+| **Screen** | Switch to another screen of the computer (its **01 - Monitor**, **02 - Monitor**… entries), **Desktop Low** or **Steam Big Picture**; fit or stretch the picture. Shown only when the computer offers them. |
+| **Video** | Bitrate (presets and slider), resolution, frame rate and the codecs this phone decodes. Sunshine fixes these when a stream starts, so the page says **Requires reconnecting** and applies them with **Apply and reconnect**. |
+| **Session** | Reconnect, disconnect, close the game on the computer, Ctrl+Alt+Del, picture-in-picture, statistics on screen. |
+
+When the connection drops, the app shows what it last measured and offers **Reconnect** and **Lower quality and reconnect**. Everything goes through the paired Sunshine connection; with a plain Sunshine computer the Big Remote Play extras simply do not appear. Details: [Big Remote Play Controller docs](https://github.com/ruscher/moonlight-android-touch/tree/brp/native-touch/docs/big-remote-play-controller).
 
 ### Resolution and black bars
 
@@ -177,7 +198,7 @@ This release brings a calmer, native look and turns the phone into a controller.
 
 - **A calmer, native look** — the window now follows AshyWall's design: the menu at the top of the sidebar, places grouped under **Streaming** and **Secure connection**, each task's state as quiet text, services as ordinary rows, and plain native cards without gradients. Every page, setting and flow is the same ([design notes](docs/redesign/02-decisoes.md)).
 - **Touch controls** — **Share → Preferences → Mouse, keyboard and controllers → Touch controls** opens the Big WM Virtual Keyboard's on-screen controller when a phone starts playing, releases it when a player leaves and closes it with the last one. Several fingers press several buttons; nothing becomes a mouse click ([details](#your-phone-as-a-controller-multi-touch)).
-- **Big Remote Play Controller for Android** — a Moonlight 12.2 build that sends every finger as its own touch, installs next to the official Moonlight and picks a resolution the phone can decode instead of failing with error -5 ([download](https://github.com/ruscher/big-remote-play/releases/tag/controller-v12.2-brpc2)).
+- **Big Remote Play Controller for Android** — a Moonlight 12.2 build that sends every finger as its own touch, installs next to the official Moonlight and picks a resolution the phone can decode instead of failing with error -5. **12.2-brpc3** adds the Big Remote Play look and a stream menu: extra keys (Ctrl, Alt, Esc, F1–F24), controller layouts for shooters, racing and fighting games, switching between the computer's screens, bitrate and codec, statistics and reconnect ([what it does](#the-stream-menu-stream-control-center), [download](https://github.com/ruscher/big-remote-play/releases/tag/controller-v12.2-brpc3)).
 - **Host has priority keeps the controller working** — the host's mouse and keyboard still pause remote input, but never the touchscreen that drives the on-screen controller ([details](docs/host-input-priority.md)).
 - **Touch where you put your finger** — with Sunshine 2026.914 the touch landed above the finger when the picture had black bars; Sunshine 2026.1113 fixes it, and the [touch notes](docs/touch/06-testes.md) explain how to tell.
 

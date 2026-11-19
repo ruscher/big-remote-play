@@ -2,7 +2,7 @@
 
 You are playing on a phone or tablet with Moonlight and need a mouse click, the keyboard or a way out. This page lists what each Moonlight app really does. Everything here was checked against Moonlight's own guide and the source of Moonlight for Android and for iPhone/iPad. Big Remote Play shows the same list under **Connect → Shortcuts & Instructions**, where the **On the Phone** tab has a QR code that opens this page.
 
-Big Remote Play does not run on the phone and cannot add buttons to Moonlight there. The keys and gestures below are Moonlight's own.
+Big Remote Play does not run on the phone and cannot add buttons to the official Moonlight there. The keys and gestures below are Moonlight's own. **Big Remote Play Controller** (the project's Android app, [README](../README.md#your-phone-as-a-controller-multi-touch)) adds its own stream menu with the missing keys; it is described where it differs.
 
 ## Mouse by touch (Android and iPhone/iPad)
 
@@ -27,7 +27,7 @@ The pointer on the phone is drawn by the game PC into the picture; Moonlight on 
 
 **iPhone/iPad.** The keyboard opened with three fingers has a bar of extra keys: **Win, Esc, Tab, Shift, Ctrl, Alt, Delete**. Win, Shift, Ctrl and Alt stay pressed until you tap them again. For Ctrl+Alt+Delete, tap Ctrl, then Alt, then Delete.
 
-**Android.** Three fingers open the phone's own keyboard, which has no Ctrl, Alt, Esc or function keys. For those, use a keyboard app that has them or a Bluetooth/USB keyboard.
+**Android.** Three fingers open the phone's own keyboard, which has no Ctrl, Alt, Esc or function keys. For those, use a keyboard app that has them or a Bluetooth/USB keyboard. In **Big Remote Play Controller**, the stream menu's **Keyboard** page opens the phone's keyboard together with a bar of extra keys: **Esc, Tab, Ctrl, Alt, Shift, Win**, arrows, Home/End, Page Up/Down, Insert, Delete, Print Screen and **F1–F24**. Ctrl, Alt, Shift and Win lock with a tap (or work while held, a setting); they are let go when the bar closes, the menu opens or the stream ends. The page also sends shortcuts (Ctrl+C, Alt+Tab, Alt+F4, Ctrl+Alt+Del, Win+D) and types the text copied on the phone.
 
 **Any phone with a Bluetooth or USB keyboard.** Every key and shortcut (Ctrl+C, Alt+Tab, F5) goes to the game PC.
 
@@ -35,7 +35,7 @@ The pointer on the phone is drawn by the game PC into the picture; Moonlight on 
 
 | Phone | Leave the game (it keeps running on the game PC) | Close the game on the game PC |
 |---|---|---|
-| Android | Back button | Moonlight's list of apps of that computer → **Quit Session** |
+| Android | Back button (in Big Remote Play Controller, Back opens the stream menu: **Disconnect**) | Moonlight's list of apps of that computer → **Quit Session** (Big Remote Play Controller: stream menu → **Session → Close on the computer**) |
 | iPhone/iPad | Swipe from the left edge of the screen | Moonlight's list of apps → **Quit Session** |
 | Apple TV | Press Menu twice on the remote | **Quit Session** |
 
@@ -49,7 +49,7 @@ A controller connected to the phone works as a controller on the game PC. Moonli
 | L1 + Start | Select, on controllers without that button |
 | Hold Start | Use the controller as a mouse: a stick moves the pointer, A clicks, B right-clicks |
 
-Moonlight for Android can also draw a controller on the screen: setting **Show on-screen controls**. Several of its buttons work at once, and it needs nothing on the game PC.
+Moonlight for Android can also draw a controller on the screen: setting **Show on-screen controls**. Several of its buttons work at once, and it needs nothing on the game PC. Big Remote Play Controller turns it on and off during the stream and adds layouts for shooters, racing and fighting games (stream menu → **Controller**).
 
 ## A controller drawn by the game PC (Touch controls)
 
@@ -110,4 +110,4 @@ Moonlight on a computer handles these keys itself; they are not sent to the game
 - Moonlight for Android: three-finger tap and Back handling in `Game.java`; the gamepad combinations and settings in its strings.
 - Moonlight for iPhone/iPad: the keyboard's extra-keys bar in `StreamView.m`.
 - Native touch: Moonlight for Android 12.2 keeps sending touches to the computer disabled in `Game.java`; Big Remote Play Controller is that app with it fixed ([test plan](touch/08-validacao-android.md)).
-- A virtual panel of keys on the phone would have to be part of the Moonlight app there. A separate service on the game PC that types keys sent from a phone would need its own authentication and pairing, and it is not provided.
+- A virtual panel of keys on the phone has to be part of the app there: Big Remote Play Controller has one and sends the keys over Moonlight's own encrypted input channel. A separate service on the game PC that types keys sent from a phone would need its own authentication and pairing, and it is not provided.
