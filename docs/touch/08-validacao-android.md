@@ -1,6 +1,19 @@
 # 08 — Validação com o celular Android
 
-Status (2026-11-14): **release 12.2-brpc2 publicada**
+Status (2026-11-19): **release 12.2-brpc3**
+([download](https://github.com/ruscher/big-remote-play/releases/tag/controller-v12.2-brpc3)),
+mesma chave e mesmo certificado do brpc2 (instala por cima). Acrescenta o menu
+da transmissão (teclas extras, layouts do controle, troca entre as entradas
+"NN - Monitor", taxa de bits e codec, estatísticas, reconectar). Testado com a
+build debug num Poco X4 Pro (Android 13) transmitindo **01 - Monitor** de um
+host Big Remote Play com três monitores: conexão, vídeo HEVC, toque nativo,
+abertura do menu pelo gesto, estatísticas reais, leitura das entradas do host
+e troca de layout ao vivo, sem crash no logcat. O toque nativo (MT-01…MT-25)
+não mudou. Ainda não visto no aparelho: a troca de monitor de ponta a ponta e
+a build release (mesmo código, com R8 e a chave de release). Decisões e plano
+de testes: [docs do app](https://github.com/ruscher/moonlight-android-touch/tree/brp/native-touch/docs/big-remote-play-controller).
+
+Anterior — Status (2026-11-14): **release 12.2-brpc2 publicada**
 ([download](https://github.com/ruscher/big-remote-play/releases/tag/controller-v12.2-brpc2),
 [código](https://github.com/ruscher/moonlight-android-touch/tree/brp/native-touch)),
 `io.github.bigremoteplay.controller`, arm64-v8a, armeabi-v7a, x86 e x86_64,

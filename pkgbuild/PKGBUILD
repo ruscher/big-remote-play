@@ -43,7 +43,9 @@ makedepends=(
 # that only connects never needs it, and Share says what is missing.
 # Touch controls: big-keyboard 0.1.0-2 or newer reads the phone's fingers
 # (0.2.4 keeps the phone's mouse, as a touchpad, on wlmaker with the keyboard and controller hidden);
-# the phone needs the Big Remote Play Controller app (see README), and
+# the phone needs the Big Remote Play Controller app (see README; 12.2-brpc3
+# adds its stream menu: extra keys, controller layouts, switching between the
+# "NN - Monitor" entries, bitrate and codec, reconnect), and
 # Sunshine 2026.1113 or newer places the touch correctly when the picture
 # has black bars (LizardByte/Sunshine@4062cb7).
 # Moonlight entries: Desktop Low and one entry per screen need a Sunshine
