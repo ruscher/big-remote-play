@@ -128,6 +128,8 @@ While a stream runs, **Playing now** at the top of Connect shows the computer's 
 
 To play with fingers on a controller drawn on this computer, open **Preferences → Mouse, keyboard and controllers → Touch controls** and choose **On-screen controller**. When a phone starts playing, the controller opens on the shared screen; when the last one leaves, every button is released and it closes. **Compatibility** checks Sunshine, the Big WM Virtual Keyboard, the virtual controller and the phone's touch, in words. The phone needs Big Remote Play Controller ([guide](mobile-controls.md#a-controller-drawn-by-the-game-pc-touch-controls)). **Mouse** makes Sunshine stop offering touch, so every finger works as a mouse.
 
+**Preferences → Mouse, keyboard and controllers → Controller type** chooses what a controller on the other device (a phone's own on-screen controller, or a controller held there) becomes on this computer. **Xbox 360** is the default because nearly every game reads it; Sunshine's own automatic choice makes an Xbox Series controller, which some games run through Proton cannot read (Double Dragon Gaiden then answers only the Guide button, which Steam handles itself). It applies the next time sharing starts.
+
 ### Playing with friends
 
 Up to four devices can play on the same computer at the same time: each friend connects from their own computer as above, and each controller becomes its own player in games made for several players. Every device receives its own stream, so the game PC's upload and each friend's download must carry it.

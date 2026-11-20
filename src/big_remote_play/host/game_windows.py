@@ -58,6 +58,8 @@ _NEVER_GAMES = frozenset(
         "xdg-desktop-portal-gtk",
         "xwaylandvideobridge",
         "org.kde.spectacle",
+        # Window Maker dock apps (clocks, monitors, mixers in the Dock and Clip)
+        "dockapp",
         # Launchers and their helpers (the game window is another process)
         "steam",
         "steamwebhelper",
@@ -362,7 +364,8 @@ def exclusion_reason(window: RawWindow, process: ProcessInfo | None, *, own_pid:
         return "not-an-app-window"
     if window.minimized:
         return "minimized"
-    if window.width < 64 or window.height < 64:
+    # A 64×64 square is a Window Maker dock tile (wmclock, wmcube…), never a game picture.
+    if window.width < 64 or window.height < 64 or (window.width <= 64 and window.height <= 64):
         return "too-small"
     if window.pid and window.pid == own_pid:
         return "this-app"
@@ -718,10 +721,21 @@ _ELEMENT_PACKAGES = {
 }
 
 
+# Wayland desktops whose games are reached through their Xwayland server: the
+# compositor runs Xwayland rootless (every window keeps its own off-screen
+# picture) with an EWMH window manager, so the X11 path lists and reads game
+# windows. Native Wayland windows are not listed there. Big WindowMaker's
+# Wayland session (wlmaker) was checked on real hardware.
+_XWAYLAND_DESKTOPS = frozenset({"WLMAKER"})
+
+
 def session_backend(env: Mapping[str, str] | None = None) -> str:
     env = os.environ if env is None else env
     if env.get("XDG_SESSION_TYPE") == "wayland" or (env.get("WAYLAND_DISPLAY") and env.get("XDG_SESSION_TYPE") != "x11"):
-        return "kwin" if "KDE" in env.get("XDG_CURRENT_DESKTOP", "").upper().split(":") else ""
+        desktops = set(env.get("XDG_CURRENT_DESKTOP", "").upper().split(":"))
+        if "KDE" in desktops:
+            return "kwin"
+        return "x11" if desktops & _XWAYLAND_DESKTOPS and env.get("DISPLAY") else ""
     return "x11" if env.get("DISPLAY") else ""
 
 

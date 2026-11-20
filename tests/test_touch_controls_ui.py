@@ -76,7 +76,7 @@ def touch(ui, monkeypatch):
     FakeKeyboard.log = []
     saved: list[bool] = []
     context = {"sharing": True, "game_window": False, "output": "DP-1", "sunshine_config": {}}
-    widget = TouchControls(on_changed=lambda: saved.append(True), context=lambda: context, keyboard_factory=FakeKeyboard)
+    widget = TouchControls(on_changed=lambda: saved.append(True), context=lambda: context, keyboard_factory=FakeKeyboard, read_devices=lambda: "")
     widget._saved = saved  # type: ignore[attr-defined]
     widget._ctx = context  # type: ignore[attr-defined]
     yield widget
@@ -130,6 +130,49 @@ def test_mouse_mode_never_opens_the_controller(touch) -> None:
     touch.on_connections(1)
     wait(lambda: False, timeout=0.3)
     assert not any(entry[0] == "show" for entry in FakeKeyboard.log)
+
+
+def test_game_window_never_opens_the_controller_the_phone_cannot_see(touch) -> None:
+    """Its virtual gamepad would be player 1 and the phone's own controller player 2."""
+    touch._ctx["game_window"] = True
+    touch.load({"touch_mode": "gamepad"})
+    touch.on_connections(1)
+    wait(lambda: False, timeout=0.3)
+    assert ("show", True) not in FakeKeyboard.log and ("start",) not in FakeKeyboard.log
+    # Fingers held after a dropped connection are still let go.
+    touch.on_connections(0)
+    assert wait(lambda: ("release",) in FakeKeyboard.log or ("show", False) in FakeKeyboard.log)
+
+
+PHONE_PAD = 'N: Name="Sunshine (libvirtualhid) X-Box 360 Controller"\nH: Handlers=event31 js2\n'
+
+
+def phone_pad_touch(touch, devices):
+    touch._read_devices = lambda: devices[0]
+    notices: list[str] = []
+    touch._notify = notices.append
+    return notices
+
+
+def test_the_phones_own_controller_keeps_this_one_closed(touch) -> None:
+    """Sunshine keeps the phone's controller until it stops: it would be player 1."""
+    phone_pad_touch(touch, [PHONE_PAD])
+    touch.load({"touch_mode": "gamepad"})
+    touch.on_connections(1)
+    wait(lambda: False, timeout=0.3)
+    assert ("show", True) not in FakeKeyboard.log
+
+
+def test_the_phones_controller_turned_on_over_this_one_is_explained_once(touch) -> None:
+    devices = [""]
+    notices = phone_pad_touch(touch, devices)
+    touch.load({"touch_mode": "gamepad"})
+    touch.on_connections(1)
+    assert wait(lambda: ("show", True) in FakeKeyboard.log)
+    devices[0] = PHONE_PAD
+    touch.on_connections(1)
+    touch.on_connections(1)
+    assert len(notices) == 1 and notices[0]
 
 
 def test_open_on_connect_can_be_turned_off(touch) -> None:

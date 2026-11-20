@@ -67,6 +67,43 @@ def sunshine_settings(mode: str) -> dict[str, str]:
     return {}
 
 
+# Sunshine's ``gamepad`` option: the controller the other device's own
+# controls (a phone's on-screen controller, a controller held there) become
+# here. Sunshine's own default, auto, makes an Xbox Series controller over
+# Bluetooth HID, which some games run through Proton cannot read (seen on
+# 2026-11-19: Double Dragon Gaiden took only the Guide button, which Steam
+# handles itself); the Xbox 360 controller is the one nearly every game reads.
+GAMEPAD_TYPES = ("x360", "xone", "xseries", "switch", "auto")
+DEFAULT_GAMEPAD = "x360"
+
+
+def gamepad_setting(value: object) -> str:
+    """The ``gamepad`` value to write: a known type, else the default."""
+    return value if isinstance(value, str) and value in GAMEPAD_TYPES else DEFAULT_GAMEPAD
+
+
+def sunshine_gamepad_present(devices: str) -> bool:
+    """Whether Sunshine made a controller for the other device (``/proc/bus/input/devices``).
+
+    Sunshine names them "Sunshine (libvirtualhid) X-Box 360 Controller" (or
+    "Sunshine X-Box One (virtual) pad" in older releases). One stays until
+    Sunshine stops, also after that device left.
+    """
+    for block in devices.split("\n\n"):
+        name = next((line[len("N: Name=") :].strip().strip('"') for line in block.splitlines() if line.startswith("N: Name=")), "")
+        handlers = next((line for line in block.splitlines() if line.startswith("H: Handlers=")), "")
+        if name.startswith("Sunshine ") and any(word.startswith("js") for word in handlers.split()):
+            return True
+    return False
+
+
+def read_input_devices(path: Path = Path("/proc/bus/input/devices")) -> str:
+    try:
+        return path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ""
+
+
 # Desktops whose compositor drops touch devices. wlmaker 0.8 ignores
 # WLR_INPUT_DEVICE_TOUCH (src/input/manager.c); measured on 2026-11-17: a
 # phone sending native touch moved nothing at all there, while Sunshine's

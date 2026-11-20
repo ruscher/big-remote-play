@@ -12,9 +12,12 @@ The window's picture comes from the desktop's own window capture:
   renders just that window off-screen into a PipeWire DMA-BUF stream; windows
   above it are not part of it. KDE asks the person to confirm the window the
   first time and restores it silently afterwards.
-- X11: the window's own contents (``ximagesrc xid=``). This is only private
-  while a compositing manager keeps windows off-screen, so capture stops as
-  soon as compositing is suspended.
+- X11 (and Xwayland games on Big WindowMaker's Wayland session): the window's
+  own contents (``ximagesrc xid=``). This is only private while the window
+  keeps its own off-screen picture: a compositing manager (or Xwayland) gives
+  every window one; without one (Window Maker, Openbox…) the helper asks the
+  X server for an automatic Composite redirection of that window alone. When
+  neither holds, capture stops.
 
 This file runs as a separate helper process (like Sunshine, it outlives the
 window). It stops itself, and says why, when the window closes, the capture
@@ -596,6 +599,7 @@ class CaptureSession:
         self.portal: _Portal | None = None
         self.compositor: subprocess.Popen | None = None
         self.pipeline = None
+        self._offscreen = None  # X11 without a compositing manager: this window's own off-screen picture
         self.ended = False
         self.reason = "stopped"
         self.started_at = time.time()
@@ -697,16 +701,30 @@ class CaptureSession:
     def _check_x11(self) -> None:
         from big_remote_play.host import x11_windows
 
+        self._release_offscreen()
         if not x11_windows.window_alive(self.spec.display, int(self.spec.handle, 16)):
             raise CaptureError("window-closed")
-        if not self._x11_private():
-            raise CaptureError("compositing-off")
+        if self._x11_private():
+            return
+        # No compositing manager: keep this one window off-screen ourselves.
+        self._offscreen = x11_windows.keep_offscreen(self.spec.display, int(self.spec.handle, 16))
+        if self._offscreen is None:
+            raise CaptureError("compositing-off", "no compositing manager and no Composite redirection")
+        _log.info("Game Window: no compositing manager; the game window is kept off-screen by Big Remote Play")
 
     def _x11_private(self) -> bool:
+        """Whether reading the window returns only its own pixels."""
         from big_remote_play.host import x11_windows
         from big_remote_play.host.game_windows import kwin_compositing_active
 
+        if self._offscreen is not None:
+            return self._offscreen.alive()
         return bool(x11_windows.compositing_active(self.spec.display)) and kwin_compositing_active() is not False
+
+    def _release_offscreen(self) -> None:
+        if self._offscreen is not None:
+            self._offscreen.release()
+            self._offscreen = None
 
     def _config_home(self) -> str:
         folder = runtime_dir() / "private-screen"
@@ -1111,6 +1129,7 @@ class CaptureSession:
             self.GLib.source_remove(self._resize_timer)
             self._resize_timer = 0
         self._stop_mirror()
+        self._release_offscreen()
         if self.portal is not None:
             self.portal.close()
             self.portal = None
