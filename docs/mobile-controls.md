@@ -72,7 +72,14 @@ sees an ordinary controller. It needs:
 The two controllers are different things: Moonlight's is drawn on the phone,
 this one on the game PC. Use one at a time, or the game sees two
 controllers. In **Game Window** the phone sees only the game, so use
-Moonlight's own controls there. Technical details: [touch controls](touch/03-arquitetura.md).
+Moonlight's own controls there: Big Remote Play does not open the game PC's
+controller when a device starts playing, because its virtual gamepad would be
+player 1 and the game would ignore the phone's controller (player 2). For
+the same reason it is not opened while Sunshine still has the phone's own
+controller (Sunshine keeps it until sharing stops), and turning the phone's
+controller on while this one is open shows a warning. **Controller type** in
+the same group chooses what the phone's controller becomes here (Xbox 360 by
+default). Technical details: [touch controls](touch/03-arquitetura.md).
 
 ### Desktops that do not accept touch (wlmaker)
 

@@ -295,6 +295,7 @@ def session(backend="kwin", **extra):
     item._resize_timer = 0
     item._awaiting_since = None
     item._stall_retried = ""
+    item._offscreen = None
     item.__dict__.update(extra)
     return item
 
@@ -340,6 +341,66 @@ def test_x11_capture_stops_when_compositing_is_suspended(monkeypatch):
     monkeypatch.setattr(game_windows, "kwin_compositing_active", lambda connection=None: False)
     item = session("x11")
     assert item._check() is False and item.reason == "compositing-off"
+
+
+class FakeOffscreen:
+    def __init__(self, alive=True):
+        self._alive = alive
+        self.released = False
+
+    def alive(self):
+        return self._alive and not self.released
+
+    def release(self):
+        self.released = True
+
+
+def test_x11_without_a_compositing_manager_keeps_the_game_off_screen_itself(monkeypatch):
+    """Window Maker on X11: no compositing manager, so the helper redirects the game window alone."""
+    held = []
+    monkeypatch.setattr(x11_windows, "window_alive", lambda display, xid: True)
+    monkeypatch.setattr(x11_windows, "compositing_active", lambda display: False)
+    monkeypatch.setattr(game_windows, "kwin_compositing_active", lambda connection=None: None)
+
+    def keep(display, xid):
+        held.append(FakeOffscreen())
+        assert (display, xid) == (":0", 0x400001)
+        return held[-1]
+
+    monkeypatch.setattr(x11_windows, "keep_offscreen", keep)
+    item = session("x11")
+    item._check_x11()
+    assert len(held) == 1 and item._check() is True and not item.ended
+    # Stopping the picture gives the window back to the X server.
+    item.stop_picture()
+    assert held[0].released and item._offscreen is None
+
+
+def test_x11_without_any_way_to_keep_the_window_private_never_starts(monkeypatch):
+    monkeypatch.setattr(x11_windows, "window_alive", lambda display, xid: True)
+    monkeypatch.setattr(x11_windows, "compositing_active", lambda display: False)
+    monkeypatch.setattr(game_windows, "kwin_compositing_active", lambda connection=None: None)
+    monkeypatch.setattr(x11_windows, "keep_offscreen", lambda display, xid: None)
+    with pytest.raises(wc.CaptureError) as error:
+        session("x11")._check_x11()
+    assert error.value.reason == "compositing-off"
+
+
+def test_x11_capture_stops_when_its_own_off_screen_picture_is_lost(monkeypatch):
+    monkeypatch.setattr(x11_windows, "window_alive", lambda display, xid: True)
+    monkeypatch.setattr(x11_windows, "compositing_active", lambda display: False)
+    item = session("x11", _offscreen=FakeOffscreen(alive=False))
+    assert item._check() is False and item.reason == "compositing-off"
+
+
+def test_x11_with_a_compositing_manager_needs_no_redirection(monkeypatch):
+    monkeypatch.setattr(x11_windows, "window_alive", lambda display, xid: True)
+    monkeypatch.setattr(x11_windows, "compositing_active", lambda display: True)
+    monkeypatch.setattr(game_windows, "kwin_compositing_active", lambda connection=None: None)
+    monkeypatch.setattr(x11_windows, "keep_offscreen", lambda display, xid: pytest.fail("redirected although a compositing manager keeps windows private"))
+    item = session("x11")
+    item._check_x11()
+    assert item._offscreen is None
 
 
 def test_x11_display_gone_ends_and_a_closed_window_is_looked_for(monkeypatch):
@@ -702,3 +763,7 @@ def test_an_intel_chipset_is_not_intel_graphics():
     graphics = display_controllers(lspci)
     assert "intel" not in graphics
     assert "radeon" in graphics and "nvidia" in graphics
+
+
+def test_off_screen_redirection_is_refused_without_an_x_server():
+    assert x11_windows.keep_offscreen("unreachable.invalid:93", 0x400001) is None

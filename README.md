@@ -158,9 +158,9 @@ To update, install the new APK over the old one (`adb install -r …`): pairing 
 
 ### 3. Turn it on
 
-1. **Game computer** — open **Share → Preferences → Mouse, keyboard and controllers → Touch controls** and set **What touch does** to **On-screen controller**. Keep **Open when a device starts playing** on. Then press **Start sharing** (**Full Desktop**; with **Game Window** the phone sees only the game, not this controller).
+1. **Game computer** — open **Share → Preferences → Mouse, keyboard and controllers → Touch controls** and set **What touch does** to **On-screen controller**. Keep **Open when a device starts playing** on. Then press **Start sharing** (**Full Desktop**; with **Game Window** the phone sees only the game, not this controller, so it is not opened by itself: turn on the app's own controller on the **Controller** page of the stream menu instead).
 2. **Phone** — open **Big Remote Play Controller**, choose the game computer and pair with the PIN, like in Moonlight.
-3. In the app's **Settings**, **Send touch to the computer (multi-touch)** is already on. Leave the app's own on-screen controller off (**Controller** page of the stream menu), or the game sees two controllers.
+3. In the app's **Settings**, **Send touch to the computer (multi-touch)** is already on. Leave the app's own on-screen controller off (**Controller** page of the stream menu), or the game sees two controllers. Sunshine keeps the phone's own controller until sharing stops, so after using it Big Remote Play does not open this one by itself, and says so if the phone's controller is turned on while this one is open; stop and start sharing to switch back.
 4. Open **Desktop**. The controller appears on the shared screen when the phone starts playing, and closes when the last device leaves. **Edit layout** moves and resizes the buttons from the phone.
 
 **Compatibility** in the same sheet says what is ready and what is missing, in words. **Release all buttons** lets go of anything still pressed after a network drop.
@@ -200,6 +200,9 @@ This release brings a calmer, native look and turns the phone into a controller.
 - **Touch controls** — **Share → Preferences → Mouse, keyboard and controllers → Touch controls** opens the Big WM Virtual Keyboard's on-screen controller when a phone starts playing, releases it when a player leaves and closes it with the last one. Several fingers press several buttons; nothing becomes a mouse click ([details](#your-phone-as-a-controller-multi-touch)).
 - **Big Remote Play Controller for Android** — a Moonlight 12.2 build that sends every finger as its own touch, installs next to the official Moonlight and picks a resolution the phone can decode instead of failing with error -5. **12.2-brpc3** adds the Big Remote Play look and a stream menu: extra keys (Ctrl, Alt, Esc, F1–F24), controller layouts for shooters, racing and fighting games, switching between the computer's screens, bitrate and codec, statistics and reconnect ([what it does](#the-stream-menu-stream-control-center), [download](https://github.com/ruscher/big-remote-play/releases/tag/controller-v12.2-brpc3)).
 - **Host has priority keeps the controller working** — the host's mouse and keyboard still pause remote input, but never the touchscreen that drives the on-screen controller ([details](docs/host-input-priority.md)).
+- **Game Window on Big WindowMaker** — **Share → Source → Game Window** now works on Big WindowMaker, on X11 and on Wayland (through Xwayland), and on X11 desktops without a compositor: Big Remote Play keeps the game's picture off-screen by itself, so nothing else is needed ([details](docs/game-window.md)).
+- **Controller type** — **Share → Preferences → Mouse, keyboard and controllers → Controller type** chooses what the other device's own controller is on this computer. **Xbox 360** is the default because it works with the most games; with the newer Xbox Series pad some games, such as Double Dragon Gaiden under Proton, read only the Guide button ([troubleshooting](docs/troubleshooting.md)).
+- **One controller at a time** — with **Game Window**, or while Sunshine still has the phone's own controller, the on-screen controller is not opened by itself, and Big Remote Play says so when the phone's controller is turned on while the on-screen one is open; the game would see two controllers and follow only one.
 - **Touch where you put your finger** — with Sunshine 2026.914 the touch landed above the finger when the picture had black bars; Sunshine 2026.1113 fixes it, and the [touch notes](docs/touch/06-testes.md) explain how to tell.
 
 Before that, finding things by themselves: your installed games, the computers on a friend's ZeroTier network and the right screen.
@@ -282,7 +285,7 @@ The Python wheel alone is not a complete desktop installation: icons, styles, tr
 | **Required** | `python` ≥ 3.11, `gtk4` ≥ 4.17, `libadwaita` ≥ 1.7, `glib2`, `gdk-pixbuf2`, `pango`, `python-gobject`, `python-cairo`, `libsecret`, `avahi`, `curl`, `iproute2`, `iputils`, `jq`, `polkit`, `procps-ng`, `systemd`, `util-linux`, `hicolor-icon-theme` |
 | **Share** | `sunshine`; for the Game Library, the launchers whose games you offer: `steam`, `lutris`, Heroic Games Launcher (native or Flatpak); `miniupnpc` to open the game ports on the router (play over the internet without a VPN) |
 | **Connect** | `moonlight-qt` (or the Moonlight Flatpak with `flatpak`) |
-| **Game Window** | Sunshine ≥ 2026.516; KDE Plasma (`kwin`, `xdg-desktop-portal-kde`) on Wayland or an X11 desktop with compositing; `gst-plugin-pipewire`, `gst-plugins-base`, `gst-plugins-bad-libs`, `gst-plugins-good` |
+| **Game Window** | Sunshine ≥ 2026.516; KDE Plasma (`kwin`, `xdg-desktop-portal-kde`) on Wayland, Big WindowMaker (X11 or Wayland) or another X11 desktop; `kwin` (private screen); `gst-plugin-pipewire`, `gst-plugins-base`, `gst-plugins-bad-libs`, `gst-plugins-good` |
 | **Touch controls** | `big-keyboard` ≥ 0.1.0-2 (remote touch; ≥ 0.2.4 for the phone's touchpad-style mouse on Big WindowMaker with the keyboard and controller hidden) and Sunshine ≥ 2026.1113 on the game PC; the Big Remote Play Controller app on the phone ([install](#your-phone-as-a-controller-multi-touch)) |
 | **Connect your devices** | one of `tailscale` or `zerotier-one`; to host your own Headscale server on this computer, `headscale` and `caddy` (`miniupnpc` reads the router's public address) |
 | **Optional** | a Secret Service provider (GNOME Keyring or KWallet) for saved passwords, `libpulse` and `pipewire` for sound, `libkscreen` (screen mode and HDR for the connecting device), `pciutils` (graphics detection), `xorg-xrandr` (monitors and the main screen on X11), `flatpak` (Moonlight, VPN clients, Steam, Lutris or Heroic installed as Flatpaks), `xdg-utils` (start Heroic games when only its link handler exists). Pamac is used to install components when it is present. |
@@ -298,6 +301,8 @@ flowchart LR
     P -->|"capture = kwin"| S["Sunshine<br/>hardware encoder"]
     S --> C["Moonlight"]
 ```
+
+On X11 and Big WindowMaker the mirror reads the game window directly (`ximagesrc`); without a compositor, Big Remote Play redirects only that window off-screen so it is never covered.
 
 Games are listed by name from their process tree — Steam, Proton, Wine, Lutris, Heroic, Gamescope and native games — and the private screen runs at 240 Hz so the game picture is not held back. Design, safety rules, measurements and limits: [Game Window](docs/game-window.md).
 

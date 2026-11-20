@@ -103,6 +103,7 @@ def test_this_application_is_never_offered_by_pid():
         ({"normal": False}, "not-an-app-window"),
         ({"minimized": True}, "minimized"),
         ({"width": 40}, "too-small"),
+        ({"width": 64, "height": 64}, "too-small"),
     ],
 )
 def test_dialogs_minimized_and_tiny_windows_are_skipped(flags, reason):
@@ -231,6 +232,30 @@ def test_capture_support_reports_what_is_missing():
     x11 = gw.capture_support({"XDG_SESSION_TYPE": "x11", "DISPLAY": ":0"}, which=lambda n: "/x", has_element=lambda n: True, sandboxed=False, version=lambda: None)
     assert x11.available and x11.backend == "x11"
     assert gw.capture_support(env, which=lambda n: "/x", has_element=lambda n: True, sandboxed=True).problem == "sandboxed"
+
+
+def test_big_windowmaker_wayland_shares_its_xwayland_games():
+    common = {"which": lambda n: "/x", "has_element": lambda n: True, "sandboxed": False, "version": lambda: None}
+    wlmaker = {"XDG_SESSION_TYPE": "wayland", "WAYLAND_DISPLAY": "wayland-0", "XDG_CURRENT_DESKTOP": "wlmaker", "DISPLAY": ":0"}
+    support = gw.capture_support(wlmaker, **common)
+    assert support.available and support.backend == "x11"
+    # Without Xwayland there is no window it can read.
+    assert gw.capture_support({**wlmaker, "DISPLAY": ""}, **common).problem == "unsupported-session"
+    # Other Wayland desktops are not assumed to behave the same way.
+    gnome = {**wlmaker, "XDG_CURRENT_DESKTOP": "GNOME"}
+    assert gw.capture_support(gnome, **common).problem == "unsupported-session"
+    # Big WindowMaker on X11 (Window Maker, no KDE) is an ordinary X11 desktop.
+    x11 = gw.capture_support({"XDG_SESSION_TYPE": "x11", "DISPLAY": ":0", "XDG_CURRENT_DESKTOP": "WindowMaker"}, **common)
+    assert x11.available and x11.backend == "x11"
+
+
+def test_window_maker_dock_apps_are_never_offered():
+    read, table = tree(proc(600, 1, "wmcube"), proc(601, 1, "wmcpuload"))
+    raw = [
+        window(1, 600, title="wmcube", app_id="wmcube", width=64, height=64),
+        window(2, 601, title="minicontrol", app_id="DockApp", width=200, height=200),
+    ]
+    assert build(raw, read, table, include_other_windows=True) == []
 
 
 def test_only_launcher_markers_are_read_from_a_process_environment(tmp_path):

@@ -235,7 +235,7 @@ class HostView(Gtk.Box):
         from .touch_controls import TouchControls
 
         # Share → Preferences → Touch controls (the phone's fingers, the on-screen controller).
-        self.touch_controls = TouchControls(on_changed=self._on_touch_controls_changed, context=self._touch_context)
+        self.touch_controls = TouchControls(on_changed=self._on_touch_controls_changed, context=self._touch_context, notify=self.show_toast)
 
         from big_remote_play.host.sunshine_manager import SunshineHost
 
@@ -1351,6 +1351,21 @@ class HostView(Gtk.Box):
                 lambda: self.touch_controls.present(self),
             )
         )
+        # The controller Sunshine makes for the other device's own controls.
+        gamepad_labels = {
+            "x360": _("Xbox 360 (works with the most games)"),
+            "xone": "Xbox One",
+            "xseries": "Xbox Series",
+            "switch": "Nintendo Switch Pro",
+            "auto": _("Automatic"),
+        }
+        self.gamepad_row = Adw.ComboRow(title=_("Controller type"), use_markup=False)
+        self.gamepad_row.set_subtitle(_("What the other device's own controller is on this computer. Applies the next time sharing starts."))
+        self.gamepad_row.set_subtitle_lines(0)
+        self.gamepad_row.set_model(Gtk.StringList.new([gamepad_labels[value] for value in touch_control.GAMEPAD_TYPES]))
+        self.gamepad_row.set_selected(touch_control.GAMEPAD_TYPES.index(touch_control.DEFAULT_GAMEPAD))
+        set_row_icon(self.gamepad_row, "brp-input-gaming-symbolic")
+        input_group.add(self.gamepad_row)
         self._sync_pointer_capture_row()
         config_page.append(input_group)
 
@@ -1578,7 +1593,7 @@ class HostView(Gtk.Box):
             return title, _("It needs Sunshine {version} or newer, which can capture the private game screen. Update Sunshine, then open Big Remote Play again.").format(version="2026.516")
         if support.problem == "sandboxed":
             return title, _("It cannot see other apps' windows from inside the Flatpak sandbox. Use the native package.")
-        return title, _("It needs KDE Plasma on Wayland, or an X11 desktop with window effects (compositing) on.")
+        return title, _("It needs KDE Plasma on Wayland, Big WindowMaker (X11 or Wayland), or another X11 desktop.")
 
     def _game_window_subtitle(self, item) -> str:
         tags = item.tags()
@@ -4466,6 +4481,7 @@ class HostView(Gtk.Box):
         config["adapter_name"] = gpu["adapter"] if gpu["encoder"] == "vaapi" and gpu["adapter"] != "auto" else None
         # Touch controls: whether Sunshine offers native touch (Automatic keeps the person's choice).
         config.update(touch_control.sunshine_settings(self.touch_controls.effective_mode))
+        config["gamepad"] = self._gamepad_type()
         # Sunshine runs this before capture and after each session; merged
         # with any global_prep_cmd the person has (see host/stream_display.py).
         from big_remote_play.host.stream_display import prep_command
@@ -5570,6 +5586,7 @@ class HostView(Gtk.Box):
                 "share_resolution": self._share_resolution(),
                 "optimization_mode": self.optimization_row.get_selected(),
                 "wifi_mode": self.wifi_row.get_active(),
+                "gamepad_type": self._gamepad_type(),
                 **self.input_priority.values(),
                 **self.touch_controls.values(),
             }
@@ -5599,6 +5616,7 @@ class HostView(Gtk.Box):
                 "stream_audio": "enabled",
                 "max_bitrate": str(bw) if bw > 0 else "0",
                 "channels": connected_clients(scm.config.get("channels")),
+                "gamepad": self._gamepad_type(),
                 **self._encoding_settings(),
             }
             if not scm.update(sunshine_settings) and scm.load_error:
@@ -5749,6 +5767,7 @@ class HostView(Gtk.Box):
             self.share_resolution_row.set_selected(self.share_resolution_values.index(saved) if saved in self.share_resolution_values else 0)
             self.optimization_row.set_selected(h.get("optimization_mode", 1))
             self.wifi_row.set_active(h.get("wifi_mode", False))
+            self.gamepad_row.set_selected(touch_control.GAMEPAD_TYPES.index(touch_control.gamepad_setting(h.get("gamepad_type"))))
             self.input_priority.load(h)
             self.touch_controls.load(h)
             self.input_priority.set_pause_touch(touch_control.priority_pauses_touch(self.touch_controls.effective_mode))
@@ -5771,6 +5790,7 @@ class HostView(Gtk.Box):
             self.optimization_row,
             self.fps_row,
             self.share_resolution_row,
+            self.gamepad_row,
         ]:
             r.connect("notify::selected", self._schedule_save_host_settings)
 
@@ -5794,6 +5814,12 @@ class HostView(Gtk.Box):
             row.connect(signal, lambda *_a: self._sync_quality_controls())
         for r in [self.custom_name_entry, self.custom_cmd_entry]:
             r.connect("notify::text", self._schedule_save_host_settings)
+
+    def _gamepad_type(self) -> str:
+        """Sunshine's ``gamepad`` value from Preferences → Controller type."""
+        index = self.gamepad_row.get_selected()
+        types = touch_control.GAMEPAD_TYPES
+        return types[index] if 0 <= index < len(types) else touch_control.DEFAULT_GAMEPAD
 
     def _schedule_save_host_settings(self, *_args):
         """Coalesce a burst of row-change signals into a single settings write."""

@@ -32,7 +32,8 @@ its own that contains nothing but the game.
 ```
 game window on the desktop
   ├─ KDE Plasma Wayland: ScreenCast portal, window source → KWin stream_window → PipeWire (DMA-BUF)
-  └─ X11: the window's own contents (ximagesrc xid=…) while the desktop composites
+  ├─ X11: the window's own contents (ximagesrc xid=…) while the window is kept off-screen
+  └─ Big WindowMaker Wayland (wlmaker): the same X11 path, through Xwayland
         ↓ mirror (GStreamer: pipewiresrc/ximagesrc → videocrop → waylandsink)
 private game screen: kwin_wayland --virtual on its own socket and D-Bus
         ↓ Sunshine capture = kwin, WAYLAND_DISPLAY = that socket
@@ -43,7 +44,19 @@ hardware encoder → Moonlight
   Wayland KWin renders only that window off-screen, so windows above it are not
   in the stream. KDE asks the person to confirm the window the first time for
   each game (**Allow restoring on future sessions** keeps that choice) and
-  restores it silently afterwards by application id and title.
+  restores it silently afterwards by application id and title. On X11 the
+  window must keep its own off-screen picture: a compositing manager gives
+  every window one; without one (Big WindowMaker on X11, Window Maker,
+  Openbox…) the helper asks the X server for an *automatic Composite
+  redirection* of the game window alone. The X server still draws it on the
+  desktop, which looks exactly the same, and drops the redirection when
+  sharing stops or the helper exits.
+- **Big WindowMaker on Wayland** (wlmaker) runs Xwayland rootless, which keeps
+  every X11 window off-screen, so games are listed and read through Xwayland.
+  Windows of native Wayland programs are not listed there; most Windows games
+  (Proton, Wine) and Steam games use X11. A native Linux game that opens a
+  Wayland window can be asked to use X11, for SDL games with
+  `SDL_VIDEODRIVER=x11` in its launch options.
 - **The private game screen** is a headless KWin that runs no shell, panel or
   notification service; the only client is the mirror. It keeps its settings
   in its own folder of the session's runtime directory, never in the desktop's
@@ -109,7 +122,8 @@ only when exactly one open window has that identity.
 - No fallback: if the game window cannot be shared, sharing does not start.
 - The helper stops showing the game at once when the window closes or crashes,
   the portal session ends, the mirror fails, the private screen exits or, on
-  X11, compositing is suspended. The private screen then shows nothing.
+  X11, the window stops being kept off-screen (compositing suspended, or the
+  helper's own redirection lost). The private screen then shows nothing.
 - A game that replaces its window (many do when switching to fullscreen or
   another mode) is followed for up to 15 seconds, only to a single window of
   the same game ([when the game changes mode](#when-the-game-changes-mode)).
@@ -193,8 +207,10 @@ the new window, needs a real game and a person
 
 ## Requirements
 
-- KDE Plasma 6 on Wayland (ScreenCast portal with window sharing), or an X11
-  desktop with compositing on.
+- KDE Plasma 6 on Wayland (ScreenCast portal with window sharing), Big
+  WindowMaker on Wayland (wlmaker with Xwayland), or an X11 desktop whose X
+  server has the Composite extension (all current Xorg servers), with or
+  without a compositing manager.
 - Sunshine **v2026.516 or newer**: its KWin capture method is the only way it can read the private screen. An older Sunshine starts without any video source, so devices connect and get sound but never a picture; Big Remote Play checks the version and says so instead.
 - `kwin_wayland` (the private screen), GStreamer with `pipewiresrc`
   (`gst-plugin-pipewire`), `waylandsink` (`gst-plugins-bad`) and `videocrop`,
@@ -230,16 +246,17 @@ the new window, needs a real game and a person
 - **Hybrid graphics.** The private screen renders on libdrm's first GPU, and
   Sunshine encodes there. On a machine whose first GPU is an integrated one the
   encoder is the integrated GPU's.
-- **X11** copies each frame through the CPU (`ximagesrc`, 60 fps) and stops when
-  compositing is suspended, because an uncomposited X server returns whatever
-  covers the window.
+- **X11** (and Big WindowMaker on Wayland) copies each frame through the CPU
+  (`ximagesrc`, 60 fps). It stops when the window can no longer be kept
+  off-screen, because an X server returns whatever covers a window that has
+  no off-screen picture of its own.
 - A game that shows several top-level windows (a separate launcher, a video
   window) is shared one window at a time.
 - A game that opens a *different* program for fullscreen (a separate process
   outside the game's process tree and without its identity) is not followed;
   sharing stops and says why.
-- Exclusive fullscreen on X11 suspends compositing, so X11 Game Window stops
-  then (privacy).
+- Exclusive fullscreen on an X11 desktop with a compositing manager (KDE
+  Plasma X11) suspends compositing, so X11 Game Window stops then (privacy).
 - With Gamescope the Gamescope window is the one followed; a Gamescope restart
   is a new process tree and is followed only by the game's identity.
 

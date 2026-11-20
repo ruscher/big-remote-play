@@ -135,7 +135,8 @@ Sunshine probes every display and encoder when capture and encoder are set to au
 ## Game Window: the game is not listed, or sharing stops
 
 - **No game windows found**: open the game first and select **Refresh**. Minimized windows are not listed (they have no picture); restore the game. For emulators and programs the list does not recognize, turn on **Show all open windows**.
-- **Game Window is not available here**: the line below names what is missing. Game Window needs KDE Plasma on Wayland or an X11 desktop with window effects (compositing) on, `kwin_wayland` and the GStreamer plugins `gst-plugin-pipewire`, `gst-plugins-bad` and `gst-plugins-good`. It is not available in the Flatpak.
+- **Big WindowMaker on Wayland: a native Linux game is not listed**: there Game Window reads games through Xwayland, so only X11 windows are listed (Steam, Proton and Wine games are). Ask the game to use X11 — for SDL games add `SDL_VIDEODRIVER=x11 %command%` to its Steam launch options — or use Full Desktop.
+- **Game Window is not available here**: the line below names what is missing. Game Window needs KDE Plasma on Wayland, Big WindowMaker (X11 or Wayland) or another X11 desktop, `kwin_wayland` and the GStreamer plugins `gst-plugin-pipewire`, `gst-plugins-bad` and `gst-plugins-good`. It is not available in the Flatpak.
 - **The other device gets sound but a black picture** (Moonlight: *No video traffic was ever received from the host*): the sharing computer needs Sunshine v2026.516 or newer for Game Window. Update Sunshine; Big Remote Play also reports an older Sunshine in the Game window list.
 - **The game window was not confirmed**: KDE's **Share screen with** dialog was cancelled or closed. Start again and choose the same game.
 - **The window chosen in the system dialog is not the selected game**: a different window was chosen in KDE's dialog; start again and choose the game selected in Big Remote Play.
@@ -143,6 +144,8 @@ Sunshine probes every display and encoder when capture and encoder are set to au
 - **The game window closed**: the game exited or crashed, or no window of the same game appeared within 15 seconds. Nothing else was shown; open the game and share again.
 - **The game opened more than one window**: Big Remote Play could not tell which one to show (a launcher and the game, or two windows of the same program). Close the extra window and share again.
 - On X11, **Window effects (compositing) are off**: many games suspend compositing in fullscreen. In **System Settings → Display and Monitor → Compositor**, turn off *Allow applications to block compositing*, or play in borderless windowed mode.
+- **Only the Guide button works** on the other device's controller (it opens Steam): the game cannot read the controller type Sunshine made. Keep **Preferences → Mouse, keyboard and controllers → Controller type** on **Xbox 360** and start sharing again.
+- **The on-screen controller stopped working** after the phone's own controller was used: Sunshine keeps that controller until sharing stops, and many games follow only the first one. Stop and start sharing, then use one controller.
 - Keys from the other device reach another program: Sunshine sends input to the active window. Click the game once on this computer.
 
 See [Game Window](game-window.md) for what it guarantees and its limits.

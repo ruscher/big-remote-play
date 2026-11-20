@@ -48,6 +48,9 @@ makedepends=(
 # "NN - Monitor" entries, bitrate and codec, reconnect), and
 # Sunshine 2026.1113 or newer places the touch correctly when the picture
 # has black bars (LizardByte/Sunshine@4062cb7).
+# Controller type (Share preferences) writes Sunshine's "gamepad" option;
+# Xbox 360 is the default because some games read only Guide from the
+# Xbox Series pad.
 # Moonlight entries: Desktop Low and one entry per screen need a Sunshine
 # that reads "output-name" and "max-bitrate" per entry (build-aux/sunshine/);
 # with a stock Sunshine those two are not offered and the page says why.
@@ -69,6 +72,7 @@ optdepends=(
 	'gst-plugins-base: Game Window sharing on X11 (color conversion)'
 	'gst-plugins-bad-libs: Game Window sharing (private game screen)'
 	'gst-plugins-good: Game Window sharing on X11 and title bar removal'
+	'libx11: Game Window on X11 and Big WindowMaker (game list; keeps the game picture off-screen without a compositor)'
 	'libkscreen: match the screen mode and HDR to the connecting device'
 	'xorg-xrandr: list monitors and the main screen on X11'
 	'pciutils: graphics adapter detection'

@@ -95,10 +95,24 @@ class TouchControls:
     thread: ``{"sharing", "game_window", "output", "sunshine_config"}``.
     """
 
-    def __init__(self, *, on_changed: Callable[[], None], context: Callable[[], Mapping[str, object]], keyboard_factory: Callable[[], backend.BigKeyboard] = backend.BigKeyboard) -> None:
+    def __init__(
+        self,
+        *,
+        on_changed: Callable[[], None],
+        context: Callable[[], Mapping[str, object]],
+        keyboard_factory: Callable[[], backend.BigKeyboard] = backend.BigKeyboard,
+        notify: Callable[[str], None] = lambda _message: None,
+        read_devices: Callable[[], str] | None = None,
+    ) -> None:
         self._on_changed = on_changed
         self._context = context
         self._keyboard_factory = keyboard_factory
+        self._notify = notify
+        self._read_devices = read_devices or (lambda: backend.read_input_devices())
+        # Whether this computer's on-screen controller was opened (main loop),
+        # and whether Sunshine had made a controller for the other device.
+        self._controller_shown = False
+        self._phone_pad = False
         self._worker = Worker()
         self._actions = Worker()
         self._loading = False
@@ -287,6 +301,10 @@ class TouchControls:
         keyboard = self._keyboard_factory()
         remote = backend.remote_touch_mode(mode, ignores_touch=ignores_touch)
         nobody_plays = self._connected == 0
+        if action in ("open", "edit"):
+            self._controller_shown = True
+        elif action == "close":
+            self._controller_shown = False
 
         def work():
             if action == "release":
@@ -327,10 +345,23 @@ class TouchControls:
         First device in a controller mode → open the controller (when chosen).
         Last device gone → release every button: Sunshine keeps the phone's
         touches held after a dropped connection, so the controller must let go.
+
+        Never by itself during Game Window: the controller is drawn on the
+        desktop, which the phone does not see, and its virtual gamepad would
+        come first, as player 1, so the game would ignore the phone's own
+        on-screen controller (player 2).
         """
         before, self._connected = self._connected, count
         mode = self.effective_mode
-        if count and not before and backend.uses_controller(mode) and self.open_row.get_active():
+        game_window = bool(self._context().get("game_window"))
+        # The other device's own controller (Sunshine made one for it): opening
+        # this one too gives the game two controllers, and many follow only
+        # the first. Sunshine keeps it until it stops, also after the device left.
+        phone_pad = backend.sunshine_gamepad_present(self._read_devices()) if count else self._phone_pad
+        appeared, self._phone_pad = phone_pad and not self._phone_pad, phone_pad
+        if appeared and before and self._controller_shown:
+            self._notify(_("The phone's own controller is on while this computer's on-screen controller is open. The game sees two controllers and may follow only one; use one of them."))
+        if count and not before and backend.uses_controller(mode) and self.open_row.get_active() and not game_window and not phone_pad:
             self.run_action("open")
         elif count and not before and backend.remote_touch_mode(mode, ignores_touch=self.ignores_touch) == "mouse":
             self.run_action("pointer")

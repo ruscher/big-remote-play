@@ -326,3 +326,119 @@ def compositing_active(display_name: str | None) -> bool | None:
 def activate_window(display_name: str | None, xid: int) -> bool:
     with X11Session(display_name) as session:
         return session.activate(xid) if session.connected else False
+
+
+# ── keeping one window off-screen without a compositing manager ─────────────
+
+
+class _XcbCookie(ctypes.Structure):
+    _fields_ = [("sequence", ctypes.c_uint)]
+
+
+class _XcbExtensionReply(ctypes.Structure):
+    _fields_ = [
+        ("response_type", ctypes.c_uint8),
+        ("pad0", ctypes.c_uint8),
+        ("sequence", ctypes.c_uint16),
+        ("length", ctypes.c_uint32),
+        ("present", ctypes.c_uint8),
+        ("major_opcode", ctypes.c_uint8),
+        ("first_event", ctypes.c_uint8),
+        ("first_error", ctypes.c_uint8),
+    ]
+
+
+_COMPOSITE_REDIRECT_AUTOMATIC = 0
+
+
+def _load_composite() -> tuple[Any, Any, Any] | None:
+    """``libX11-xcb`` (from libx11) and ``libxcb-composite`` (from libxcb): no new package."""
+    try:
+        x11_xcb = ctypes.CDLL(ctypes.util.find_library("X11-xcb") or "libX11-xcb.so.1")
+        xcb = ctypes.CDLL(ctypes.util.find_library("xcb") or "libxcb.so.1")
+        composite = ctypes.CDLL(ctypes.util.find_library("xcb-composite") or "libxcb-composite.so.0")
+        libc = ctypes.CDLL(ctypes.util.find_library("c") or "libc.so.6")
+    except OSError:
+        return None
+    x11_xcb.XGetXCBConnection.restype = ctypes.c_void_p
+    x11_xcb.XGetXCBConnection.argtypes = [ctypes.c_void_p]
+    xcb.xcb_get_extension_data.restype = ctypes.POINTER(_XcbExtensionReply)
+    xcb.xcb_get_extension_data.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+    xcb.xcb_request_check.restype = ctypes.c_void_p
+    xcb.xcb_request_check.argtypes = [ctypes.c_void_p, _XcbCookie]
+    xcb.xcb_connection_has_error.restype = ctypes.c_int
+    xcb.xcb_connection_has_error.argtypes = [ctypes.c_void_p]
+    composite.xcb_composite_query_version.restype = _XcbCookie
+    composite.xcb_composite_query_version.argtypes = [ctypes.c_void_p, ctypes.c_uint32, ctypes.c_uint32]
+    composite.xcb_composite_query_version_reply.restype = ctypes.c_void_p
+    composite.xcb_composite_query_version_reply.argtypes = [ctypes.c_void_p, _XcbCookie, ctypes.c_void_p]
+    composite.xcb_composite_redirect_window_checked.restype = _XcbCookie
+    composite.xcb_composite_redirect_window_checked.argtypes = [ctypes.c_void_p, ctypes.c_uint32, ctypes.c_uint8]
+    libc.free.argtypes = [ctypes.c_void_p]
+    return (x11_xcb, xcb, composite), libc, ctypes.addressof(ctypes.c_char.in_dll(composite, "xcb_composite_id"))  # type: ignore[return-value]
+
+
+class OffscreenWindow:
+    """Keep one window's contents in its own off-screen picture (X Composite).
+
+    Without a compositing manager (Window Maker, Openbox…) the X server keeps
+    no separate picture of a window: reading a covered window returns the
+    pixels of whatever covers it. An *automatic* Composite redirection gives
+    this one window its own off-screen picture, which the X server still
+    draws on the screen by itself, so the desktop looks exactly the same.
+
+    The redirection belongs to this connection: it lasts while the object is
+    held and the X server drops it when the connection closes, whatever way
+    the process ends. Nothing about the window itself is changed.
+    """
+
+    def __init__(self, display_name: str | None, xid: int) -> None:
+        self.xid = xid
+        self._session: X11Session | None = None
+        self._libs: Any = None
+        self.held = False
+        session = X11Session(display_name)
+        if not session.connected:
+            session.close()
+            return
+        loaded = _load_composite()
+        if loaded is None:
+            session.close()
+            return
+        (x11_xcb, xcb, composite), libc, extension = loaded
+        connection = x11_xcb.XGetXCBConnection(session._display)
+        if not connection or xid not in session.client_list():
+            session.close()
+            return
+        data = xcb.xcb_get_extension_data(connection, extension)
+        if not data or not data.contents.present:
+            session.close()
+            return
+        reply = composite.xcb_composite_query_version_reply(connection, composite.xcb_composite_query_version(connection, 0, 4), None)
+        if not reply:
+            session.close()
+            return
+        libc.free(reply)
+        error = xcb.xcb_request_check(connection, composite.xcb_composite_redirect_window_checked(connection, xid, _COMPOSITE_REDIRECT_AUTOMATIC))
+        if error:
+            libc.free(error)
+            session.close()
+            return
+        self._session, self._libs, self._connection = session, xcb, connection
+        self.held = True
+
+    def alive(self) -> bool:
+        """Whether the redirection still stands (the X connection is open and healthy)."""
+        return self.held and self._session is not None and not self._libs.xcb_connection_has_error(self._connection)
+
+    def release(self) -> None:
+        if self._session is not None:
+            self._session.close()  # the X server drops the redirection with the connection
+            self._session = None
+        self.held = False
+
+
+def keep_offscreen(display_name: str | None, xid: int) -> OffscreenWindow | None:
+    """Hold ``xid`` in its own off-screen picture, or ``None`` when the X server cannot."""
+    window = OffscreenWindow(display_name, xid)
+    return window if window.held else None
