@@ -57,7 +57,69 @@ def test_checks_that_need_sharing_say_so_instead_of_guessing():
 def test_keyring_states_are_distinct():
     assert by_key(hc.Facts(keyring="unresponsive"))["keyring"].action == hc.ACTION_RETRY_KEYRING
     assert by_key(hc.Facts(password_rejected=True))["keyring"].action == hc.ACTION_ENTER_PASSWORD
-    assert by_key(hc.Facts(keyring="unavailable"))["keyring"].state == hc.WARNING
+    # No keyring is not a pending problem: the password goes to an owner-only file.
+    assert by_key(hc.Facts(keyring="unavailable"))["keyring"].state == hc.INFO
+
+
+def test_a_password_kept_in_the_private_file_is_not_reported_as_unremembered():
+    """It used to say "No system keyring: passwords cannot be remembered" with a
+    warning, although the password was saved in the owner-only file."""
+    row = by_key(hc.Facts(keyring="unavailable", password_known=True, password_persisted=True, password_location="file"))["keyring"]
+    assert row.state == hc.OK and not row.needs_attention
+    assert any("KWallet" in step or "GNOME Keyring" in step for step in row.steps)
+
+
+SCENARIOS = (
+    hc.Facts(),
+    hc.Facts(sunshine_installed=True),
+    hc.Facts(
+        sunshine_installed=True,
+        sunshine_running=True,
+        moonlight_installed=True,
+        keyring="available",
+        password_known=True,
+        password_persisted=True,
+        firewall_blocked_ports=(),
+        encoders=("AMD (VAAPI)",),
+    ),
+    hc.Facts(
+        sunshine_installed=True,
+        sunshine_running=True,
+        unusable_devices=("/dev/uinput",),
+        keyring="available",
+        password_known=True,
+        cursor_problem="No KMS cursor plane found",
+        cursor_fix="kwin",
+        firewall_blocked_ports=("47989/tcp",),
+        firewall_tool="ufw",
+    ),
+    hc.Facts(sunshine_installed=True, sunshine_running=True, cursor_problem="cannot capture", firewall_blocked_ports=()),
+    hc.Facts(keyring="unresponsive"),
+    hc.Facts(password_rejected=True),
+    hc.Facts(keyring="unavailable"),
+    hc.Facts(keyring="unavailable", password_known=True, password_persisted=True, password_location="file"),
+)
+
+
+def test_every_row_explains_what_is_happening_and_what_to_do():
+    for facts in SCENARIOS:
+        for row in hc.checks(facts):
+            assert row.explanation.strip(), (row.key, row.state)
+            assert row.steps and all(step.strip() for step in row.steps), (row.key, row.state)
+
+
+def test_attention_is_exactly_the_warnings_and_problems():
+    rows = hc.checks(SCENARIOS[3])
+    assert {row.key for row in hc.attention(rows)} == {"sharing", "input", "pointer", "keyring", "firewall"} - {"sharing"}
+    assert all(row.state in (hc.WARNING, hc.PROBLEM) for row in hc.attention(rows))
+    assert hc.attention(hc.checks(SCENARIOS[2])) == []
+
+
+def test_a_missing_sharing_program_offers_install_and_moonlight_is_optional():
+    rows = by_key(hc.Facts())
+    assert (rows["sharing"].state, rows["sharing"].action) == (hc.PROBLEM, hc.ACTION_INSTALL)
+    assert (rows["receiving"].state, rows["receiving"].action) == (hc.INFO, hc.ACTION_INSTALL_RECEIVER)
+    assert not rows["receiving"].needs_attention
 
 
 def test_every_state_has_words():

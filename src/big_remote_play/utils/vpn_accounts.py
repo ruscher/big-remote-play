@@ -64,6 +64,7 @@ _RESUMABLE_SETTINGS = frozenset(
     }
 )
 _SETTING_RE = re.compile(r"^--([a-z][a-z0-9-]*)(?:=([^\s]*))?$")
+_TIMEOUT_RE = re.compile(r"^--timeout=\d+(?:\.\d+)?(?:ms|s|m|h)$")
 _AUTH_URL_RE = re.compile(r"https://[^\s\"'<>]+")
 _PERMISSION_MARKERS = (
     "permission denied",
@@ -228,11 +229,17 @@ def suggested_up_settings(output: str) -> list[str] | None:
         words = shlex.split(line)[2:]
     except ValueError:
         return None
+    settings: list[str] = []
     for word in words:
+        if _TIMEOUT_RE.fullmatch(word):
+            # The client repeats the command's own --timeout (ours): an option
+            # of this run, not a saved setting. The caller already passes one.
+            continue
         match = _SETTING_RE.fullmatch(word)
         if match is None or match.group(1) not in _RESUMABLE_SETTINGS:
             return None
-    return words
+        settings.append(word)
+    return settings
 
 
 def extract_auth_url(line: str) -> str:

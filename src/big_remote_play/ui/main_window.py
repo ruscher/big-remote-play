@@ -25,7 +25,7 @@ from big_remote_play.utils.config import Config
 from big_remote_play.utils.network import NetworkDiscovery
 from big_remote_play.utils.system_check import SystemCheck
 from big_remote_play.utils.icons import create_icon_widget, create_logo_widget
-from big_remote_play.utils.i18n import _, pgettext
+from big_remote_play.utils.i18n import _, ngettext, pgettext
 from big_remote_play.utils.secure_io import secure_write_text
 from big_remote_play import paths
 import subprocess
@@ -484,6 +484,15 @@ class MainWindow(Adw.ApplicationWindow):
                 state.add_css_class(css_class)
             box.append(state)
             self._nav_state_labels[page_id] = state
+        if page_id == "host":
+            # Support → Check this computer still shows a warning or a problem.
+            from .support_center import ATTENTION_ICON
+
+            attention = create_icon_widget(ATTENTION_ICON, size=16)
+            attention.set_valign(Gtk.Align.CENTER)
+            attention.set_visible(False)
+            box.insert_child_after(attention, label)
+            self._nav_attention_icon = attention
 
         # The row itself is the control. A Gtk.Button inside would draw button
         # chrome and Adwaita's bold button text, which is not how a navigation
@@ -619,6 +628,29 @@ class MainWindow(Adw.ApplicationWindow):
                 # TRANSLATORS: accessible description of a sidebar entry: {description} explains the task, {state} is Running, Stopped…
                 description = _("{description}. {state}").format(description=info.get("description", ""), state=activity_text(activity))
                 row.update_property([Gtk.AccessibleProperty.DESCRIPTION], [description])
+                if page_id == "host":
+                    self._refresh_share_attention()
+
+    def _refresh_share_attention(self) -> None:
+        """Share in the sidebar: a yellow exclamation, with words, while Support lists something to solve."""
+        icon = getattr(self, "_nav_attention_icon", None)
+        host = getattr(self, "host_view", None)
+        if icon is None or host is None:
+            return
+        count = len(getattr(host, "support_attention", ()))
+        icon.set_visible(count > 0)
+        # TRANSLATORS: tooltip and accessible text of the exclamation next to Share in the sidebar; {count} is how many checks need attention.
+        text = ngettext("{count} item in Support needs attention", "{count} items in Support need attention", count).format(count=count) if count else ""
+        icon.set_tooltip_text(text or None)
+        row = icon.get_ancestor(Gtk.ListBoxRow)
+        if row is not None:
+            description = self._navigation_pages().get("host", {}).get("description", "")
+            activity = self._task_activity.get("host")
+            if activity is not None:
+                description = _("{description}. {state}").format(description=description, state=activity_text(activity))
+            if text:
+                description = _("{description}. {state}").format(description=description, state=text)
+            row.update_property([Gtk.AccessibleProperty.DESCRIPTION], [description])
 
     def _on_task_state_changed(self, *, from_share: bool = True) -> None:
         """Share or Connect changed state in this window: say so at once, then confirm with a probe."""
@@ -707,6 +739,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.guest_view = GuestView()
         self.content_stack.add_named(self.guest_view, "guest")
         self.host_view.add_state_listener(self._on_task_state_changed)
+        self.host_view.add_attention_listener(self._refresh_share_attention)
         # Connect says nothing about Sunshine: keep its probed state.
         self.guest_view.add_state_listener(lambda: self._on_task_state_changed(from_share=False))
 

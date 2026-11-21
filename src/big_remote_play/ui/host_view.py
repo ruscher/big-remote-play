@@ -4,6 +4,7 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 
 from collections.abc import Callable
+from typing import TYPE_CHECKING
 from gi.repository import Gtk, Gdk, Adw, GLib, Pango  # type: ignore
 import logging
 
@@ -26,6 +27,9 @@ from big_remote_play.host.sunshine_manager import PIN_CHOOSE, PIN_NONE_WAITING
 from big_remote_play.utils.sunshine_credentials import DEFAULT_SUNSHINE_USER, SAVED, SAVED_LOCAL, SunshineCredentials
 from big_remote_play.utils.uri import open_uri, open_path
 from big_remote_play.host import touch_control
+
+if TYPE_CHECKING:
+    from big_remote_play.host.health_checks import Facts
 from .components import physical_size, action_row, boxed_rows, intro, preferences_dialog, set_row_icon, content_dialog, name_icon_button
 
 
@@ -202,6 +206,12 @@ class HostView(Gtk.Box):
         self.sharing_transition: str | None = None
         # The window's sidebar shows whether Share is running.
         self._state_listeners: list[Callable[[], None]] = []
+        # Check this computer: rows still needing something done, and the
+        # pending scheduled check (GLib source id).
+        self.support_attention: tuple = ()
+        self._support_check_id: int | None = None
+        self._support_checked_hosting: bool | None = None
+        self._attention_listeners: list[Callable[[], None]] = []
         self.process = None  # Initialize to avoid AttributeError
         self.pin_code = None
         self.audio_devices = []
@@ -271,6 +281,8 @@ class HostView(Gtk.Box):
         self._ensure_sunshine_config()
 
         self.sync_ui_state()
+        # Read-only: what still needs doing shows on Support and in the sidebar.
+        self._schedule_support_check()
         self._recover_audio_session()
         self._recover_game_window_capture()
         if self._source() == "game_window":
@@ -281,6 +293,10 @@ class HostView(Gtk.Box):
     def add_state_listener(self, callback: Callable[[], None]) -> None:
         """``callback()`` on the GTK thread when sharing starts, stops or changes phase."""
         self._state_listeners.append(callback)
+
+    def add_attention_listener(self, callback: Callable[[], None]) -> None:
+        """``callback()`` on the GTK thread when :attr:`support_attention` changes."""
+        self._attention_listeners.append(callback)
 
     def _announce_state(self) -> None:
         for listener in list(self._state_listeners):
@@ -1399,8 +1415,11 @@ class HostView(Gtk.Box):
         from .support_center import SupportCenter
 
         self.support_center = SupportCenter(
-            gather=self._support_facts,
+            gather=self._support_facts_job,
+            on_attention=self._show_support_attention,
             actions={
+                health_checks.ACTION_INSTALL: lambda: self._install_from_support(("sunshine",)),
+                health_checks.ACTION_INSTALL_RECEIVER: lambda: self._install_from_support(("moonlight",)),
                 health_checks.ACTION_START: lambda: (self.view_stack.set_visible_child_name("overview"), None if self.is_hosting else self.toggle_hosting(self.overview_start_button)),
                 health_checks.ACTION_ALLOW_FIREWALL: lambda: self.on_configure_firewall_clicked(None),
                 health_checks.ACTION_FIX_POINTER: self._fix_pointer_from_support,
@@ -1425,8 +1444,11 @@ class HostView(Gtk.Box):
         support_page.append(self.summary_box)
         support_page.append(server_tools_group)
         support_page.append(self._create_app_diagnostics_group())
+        self.support_page = support_page
         self.view_stack.add_titled_with_icon(support_page, "support", _("Support"), "brp-support-symbolic")
-        # Checks run only when Support is shown, never in the background.
+        # Check this computer runs (read-only) when the window opens, when
+        # sharing starts or stops and whenever Support is shown, so the
+        # Support tab and the sidebar can say that something needs doing.
         self.view_stack.connect("notify::visible-child-name", lambda stack, _pspec: self._on_tab_changed(stack.get_visible_child_name()))
 
         self.perf_monitor.set_visible(False)
@@ -2416,15 +2438,69 @@ class HostView(Gtk.Box):
 
         self._credentials_worker.submit(self.credentials.persist, done, failed=lambda _error: done(""), keep_previous=True)
 
-    def _support_facts(self):
-        """Worker thread: what Support → Check this computer shows."""
+    def _support_facts_job(self) -> Callable[[], "Facts"]:
+        """GTK thread: read the widgets now; return the worker job for Check this computer."""
         from big_remote_play.host.health_checks import gather_facts
 
         index = self.platform_row.get_selected()
         configured = (self._capture_values[index] if 0 <= index < len(self._capture_values) else "") or self._automatic_capture()
         encoders = tuple(str(gpu.get("label", "")) for gpu in self.available_gpus if gpu.get("encoder") not in (None, "", "auto", "software"))
-        self.credentials.get()  # bounded; read once per session
-        return gather_facts(sunshine=self.sunshine, credentials_status=self.credentials.status(), configured_capture=configured, encoders=encoders)
+        sunshine, credentials = self.sunshine, self.credentials
+
+        def job() -> "Facts":
+            credentials.get()  # bounded; read once per session
+            return gather_facts(sunshine=sunshine, credentials_status=credentials.status(), configured_capture=configured, encoders=encoders)
+
+        return job
+
+    def _show_support_attention(self, attention: list) -> None:
+        """GTK thread: Support's tab (and, through the listeners, the sidebar) shows what needs doing."""
+        if self._closed:
+            return
+        self.support_attention = tuple(attention)
+        from .support_center import ATTENTION_ICON
+
+        page = self.view_stack.get_page(self.support_page)
+        if page is not None:
+            page.set_needs_attention(bool(attention))
+            # The count as a native badge; the words are on Support itself and
+            # in the sidebar's tooltip and accessible description.
+            page.set_badge_number(len(attention))
+            page.set_icon_name(ATTENTION_ICON if attention else "brp-support-symbolic")
+        for listener in list(self._attention_listeners):
+            listener()
+
+    def _schedule_support_check(self, seconds: int = 0) -> None:
+        """Check this computer again soon (read-only), once, whatever page is open."""
+        if self._support_check_id is not None:
+            GLib.source_remove(self._support_check_id)
+
+        def run() -> bool:
+            self._support_check_id = None
+            if not self._closed:
+                self.support_center.refresh()
+            return False
+
+        self._support_check_id = GLib.timeout_add_seconds(seconds, run) if seconds else GLib.idle_add(run)
+
+    def _install_from_support(self, component_ids: tuple[str, ...]) -> None:
+        """Install a missing program in place (shared installer), then check again."""
+        from .dependency_installer import InstallDialog
+
+        if component_ids == ("sunshine",):
+            description = _("To share this computer, Big Remote Play needs one more program. It installs it for you after asking for your password once.")
+        else:
+            description = _("To play from this computer, Big Remote Play needs one more program. It installs it for you after asking for your password once.")
+
+        def ready() -> None:
+            root = self.get_root()
+            if hasattr(root, "check_system"):
+                root.check_system()
+            self._schedule_support_check()
+
+        dialog = InstallDialog(component_ids, title=_("Let's get this computer ready"), description=description, on_ready=ready)
+        self._support_install_dialog = dialog
+        dialog.present(self)
 
     def _fix_pointer_from_support(self) -> None:
         report = getattr(self, "_cursor_report", None)
@@ -2435,10 +2511,10 @@ class HostView(Gtk.Box):
         self._check_cursor()
 
     def _on_tab_changed(self, name: str | None) -> None:
+        # A check already running elsewhere still finishes: the tab and the
+        # sidebar need its answer even when Support is not open.
         if name == "support":
             self.support_center.refresh()
-        else:
-            self.support_center.cancel()
         if name == "config":
             self._show_credentials_state()
 
@@ -3899,6 +3975,12 @@ class HostView(Gtk.Box):
         self._sync_game_window_timer()
         self._sync_pair_status()
         self._show_transition()
+        if self.sharing_transition is None and self._support_checked_hosting is not None and self._support_checked_hosting != self.is_hosting:
+            # Sharing started or stopped: the pointer and firewall rows change.
+            # Sunshine opens (and logs) its screen capture a few seconds in.
+            self._schedule_support_check(8 if self.is_hosting else 0)
+        if self.sharing_transition is None:
+            self._support_checked_hosting = self.is_hosting
         self._announce_state()
 
     # ── without a VPN: the router's game ports ───────────────────────────
@@ -5871,6 +5953,9 @@ class HostView(Gtk.Box):
             self._internet_worker.close()
         if hasattr(self, "support_center"):
             self.support_center.close()
+        if self._support_check_id is not None:
+            GLib.source_remove(self._support_check_id)
+            self._support_check_id = None
         for name in ("_pin_worker", "_cursor_worker"):
             worker = getattr(self, name, None)
             if worker is not None:
