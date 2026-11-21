@@ -141,7 +141,20 @@ def test_turn_on_reports_a_sign_in_instead_of_success():
     assert not result.connected and result.backend_state == "NeedsLogin"
 
 
+def test_turn_on_accepts_the_suggestion_that_repeats_our_timeout():
+    """Tailscale 1.102 repeats `--timeout=30s` in the command it suggests; the
+    whole suggestion used to be refused, so Start never reconnected Headscale
+    after Stop ("Headscale could not be started")."""
+    echoed = NON_DEFAULT.replace("tailscale up --login-server", "tailscale up --timeout=30s --login-server").replace(" --operator=player", "")
+    runner = Scripted(CommandResult(1, "", echoed), CommandResult(0))
+    assert manager(runner).resume_tailscale().connected
+    assert runner.calls[1] == ["tailscale", "up", "--timeout=30s", "--login-server=https://hs.example.test"]
+
+
 def test_suggested_settings_parser():
+    assert suggested_up_settings("\ttailscale up --timeout=30s --ssh") == ["--ssh"]
+    assert suggested_up_settings("\ttailscale up --timeout=30s; --ssh") is None
+    assert suggested_up_settings("\ttailscale up --timeout=x --ssh") is None
     assert suggested_up_settings("no suggestion here") == []
     assert suggested_up_settings("\ttailscale up --ssh --hostname=game-pc") == ["--ssh", "--hostname=game-pc"]
     assert suggested_up_settings("\ttailscale up --hostname='unterminated") is None
